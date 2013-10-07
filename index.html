@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GTS Gate/JB Route Finder</title>
+    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+    <style type="text/css">
+      ::selection {
+        background: #adadad;
+      }
+      body, input {
+        background-color: #222;
+        font-family: "EVE Sans Neue", sans-serif;
+        font-size: 10pt;
+      }
+      body {
+        color: #989898;
+      }
+      input {
+        color: #bfbfbf;
+        border: 1px solid black;
+      }
+      input:focus {
+        border: 1px solid #333;
+      }
+      button {
+        font-family: "EVE Sans Neue",sans-serif;
+        font-size: 10pt;
+        color: #9a9a9a;
+        background-image: -moz-linear-gradient(to bottom, black, #151515);
+        background: -webkit-gradient(linear, left top, left bottom, from(black), to(#151515));
+        border: 1px solid black;
+        border-bottom: 1px solid #353535;
+      }
+      button:hover {
+        border-color: #999;
+      } 
+      button:active {
+        border-color: white;
+        position: relative;
+        top: 1px;
+      }
+      form, #output > * {
+        background-color: black;
+        padding: 8px;
+        border: 1px solid #333;
+        border-radius: 2px;
+      }
+      #output {
+        margin-top: 8px;
+      }
+      #output ul {
+        padding: 0;
+        margin: 0;
+        display: block;
+      }
+      #output li {
+        list-style-type: none;
+        list-style-position: inside;
+        display: inline;
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+      }
+      .unnamed-system {
+        font-family: monospace;
+      }
+      #output button, #total {
+        float: right;
+        margin: 0;
+        margin-left: 2em;
+      }
+      #output .pad {
+        font-size: 0;
+      }
+      .jump {
+        margin: 0 8px;
+        font-style: oblique;
+      }
+      .jump:after {
+        margin-left: 5px;
+        width: 13px;
+        height: 11px;
+        padding: 0;
+        display: inline-block;
+        border: 0;
+      }
+      .destination .jump:after {
+        background-color: yellow;
+      }
+      .jump-jb:after {
+        background: white url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA0AAAAMCAQAAAATvv9SAAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADk0AAA5NAUbVaAkAAAAHdElNRQfdCgYXBgar/1VqAAAAJWlUWHRDb21tZW50AAEAAAAImXMuSk0sSU1RKM8syVBw9/QNAAA3nQXiEzZwDQAAAK5JREFUGNNN0DFuwlAMBuBvoBN7t3AulInSk3SJ1J0LsCBRpBepXXMBTvCGro8hE5XnqmFIApUn+5N+2WaYqshTlWlyh4O1SmXtqIiZimzry9WPT68aZaalTpZkoUi2PsRI2dKv4m/KaNW6kcLZwpuYul5lP1NYeP9HK81IV0++FaHcA3cjPbsIWQhFtnGS5jU6L1q9XmujkZTHyUe1ykrtJDk/vjEInb3GTpINhhsRAXgiGiDapgAAAABJRU5ErkJggg==) no-repeat left top;
+        content: "";
+      }
+      .jump-gate:after {
+        background: white url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA0AAAAMCAQAAAATvv9SAAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADk0AAA5NAUbVaAkAAAAHdElNRQfdCgYXBSK80eJ4AAAAJWlUWHRDb21tZW50AAEAAAAImXMuSk0sSU1RKM8syVBw9/QNAAA3nQXiEzZwDQAAALhJREFUGNNF0LFNw1AQBuAP9nDmYYTIlQlSMgMiUHqCLJAGKYl4lqBNkYLGE7wFrnEFej0yRaxYf3ef9OvuGKeEPCWmyQ3eLVUqSwehXCkU4dGXH78+PWmFkfDsqJclWRGSlaNC787a1lH4m8o7tfOVHqysvbgoRsWgsp9p49W3PNFCS+/expsPSRG3wh1hq7OX9YoiZI2TdF2+d9boDAadRiuJ+eSDWmWhdpL08zdGxdleayfJRuM/vfRvzuvCHXUAAAAASUVORK5CYII=) no-repeat left top;
+        content: "";
+      }
+    </style>
+    <script>
+      function reset(destination) {
+        if (currentRequest) {
+          currentRequest.abort();
+        }
+        if (currentTimeout) {
+          window.clearTimeout(currentTimeout);
+          currentTimeout = null;
+        }
+        if (waypointTimeout) {
+          window.clearTimeout(waypointTimeout);
+          waypointTimeout = null;
+        }
+
+        setOutput();
+
+        lastStart = null;
+
+        if (destination)
+          findRoute(destination);
+      }
+
+      function findRoute(destination) {
+        var r = currentRequest = new XMLHttpRequest();
+        r.open("GET", "/to/" + destination);
+        if (!window.CCPEVE)
+          r.setRequestHeader("EVE_SOLARSYSTEMNAME", "VFK-IV");
+        r.onreadystatechange = function(e) {
+          if (r.readyState != 4)
+            return;
+          if (r.status == 200) {
+            displayRoute(r.responseText);
+            currentTimeout = window.setTimeout(function() {
+                currentTimeout = null;
+                findRoute(destination);
+            }, 5000);
+            currentRequest = null;
+          } else {
+            setOutput(document.createTextNode("couldn't find route"));
+          }
+        };
+        r.send(null);
+      }
+
+      function setOutput(node) {
+        var output = document.getElementById("output");
+        while (output.firstChild)
+          output.removeChild(output.firstChild);
+        if (node)
+          output.appendChild(node);
+      }
+
+      function popWaypoint() {
+        if (waypoints.length == 0)
+          return;
+        var sysId = waypoints.shift();
+        if (window.CCPEVE) {
+          if (sysId == 0)
+            CCPEVE.setDestination(0);
+          else
+            CCPEVE.addWaypoint(sysId);
+        }
+        waypointTimeout = window.setTimeout(popWaypoint, 1500);
+      }
+
+      function displayRoute(routeText) {
+        var lines = routeText.split("\n");
+        if (lines.length > 0 && lines[lines.length-1] == "")
+          lines.pop();
+        if (lines.length == 0) {
+          setOutput(document.createTextNode("no route found"));
+          return;
+        }
+        var start = lines[0].split(':', 2)[0];
+        if (start == lastStart)
+          return;
+        lastStart = start;
+        var resultDiv = document.createElement("div");
+        resultDiv.setAttribute("id", "results");
+        var resultList = document.createElement("ul");
+        var resultReset = document.createElement("button");
+        resultReset.addEventListener("click", function() { reset(); });
+        resultReset.appendChild(document.createTextNode("Clear"));
+        resultDiv.appendChild(resultReset);
+        var resultTotal = document.createElement("p");
+        resultTotal.appendChild(
+            document.createTextNode("Total jumps: " + (lines.length - 1)));
+        resultTotal.setAttribute("id", "total");
+        resultDiv.appendChild(resultTotal);
+        var destinationSet = false;
+        waypoints = [0];
+        if (waypointTimeout) {
+          window.clearTimeout(waypointTimeout);
+          waypointTimeout = null;
+        }
+        waypointTimeout = window.setTimeout(popWaypoint, 1500);
+        var sysId;
+        var lastSysId;
+        for (var i = 0; i < lines.length; ++i) {
+          var r = /^(\d+):(.*?)(?: @ (\d+)-(\d+))?$/.exec(lines[i]);
+          if (!r) continue; //welp
+          var sysName = r[2];
+          var li = document.createElement("li");
+          if (i > 0) {
+            var spanJump = document.createElement("span");
+            var spanPad1 = document.createElement("span")
+            spanPad1.setAttribute("class", "pad");
+            li.appendChild(spanPad1);
+            li.appendChild(spanJump);
+            if (r[3]) {
+              var jbPlanet = parseInt(r[3]);
+              var jbMoon = parseInt(r[4]);
+              spanJump.appendChild(document.createTextNode(jbPlanet + "-" + jbMoon));
+              spanJump.setAttribute("class", "jump jump-jb");
+              spanPad1.appendChild(document.createTextNode(", take jb at "));
+              var spanPad2 = document.createElement("span");
+              spanPad2.appendChild(document.createTextNode(" to "));
+              spanPad2.setAttribute("class", "pad");
+              li.appendChild(spanPad2);
+            } else {
+              spanJump.setAttribute("class", "jump jump-gate");
+              spanPad1.appendChild(document.createTextNode(", jump "));
+            }
+          }
+          var spanSys = document.createElement("span");
+          spanSys.appendChild(document.createTextNode(sysName));
+          if (/^[A-Z0-9]{1,4}-[A-Z0-9]{1,4}$/.test(sysName))
+            spanSys.setAttribute("class", "system-name unnamed-system");
+          else
+            spanSys.setAttribute("class", "system-name");
+          li.appendChild(spanSys);
+
+          sysId = parseInt(r[1]);
+          if (r[3] || i == lines.length - 1) {
+            if (!destinationSet) {
+              li.setAttribute("class", "destination");
+              destinationSet = true;
+              if (window.CCPEVE) {
+                if (i == lines.length - 1)
+                  waypoints.push(sysId);
+                else if (lastSysId)
+                  waypoints.push(lastSysId);
+              }
+            }
+          }
+          lastSysId = sysId;
+          resultList.appendChild(li);
+        }
+        resultDiv.appendChild(resultList);
+        setOutput(resultDiv);
+      }
+
+      var currentRequest;
+      var currentTimeout;
+      var lastStart;
+      var waypoints;
+      var waypointTimeout;
+      //if (window.CCPEVE) {
+      {
+        document.addEventListener("DOMContentLoaded", function() {
+          if (window.CCPEVE)
+            CCPEVE.requestTrust("http://localhost:23455");
+          var input = document.getElementById("destination");
+          var form = document.getElementById("form");
+          form.addEventListener("submit", function(e) {
+            e.preventDefault();
+            reset(input.value);
+          });
+          var submit = document.getElementById("submit");
+          submit.disabled = false;
+          var igbMsg = document.getElementById("igb-msg");
+          igbMsg.parentNode.removeChild(igbMsg);
+        });
+      }
+    </script>
+  </head>
+  <body>
+    <noscript>Javascript required</noscript>
+    <div id="igb-msg">
+      <p>EVE IGB required</p>
+    </div>
+    <div>
+      <form id="form">
+        <input type="text" size="12" name="destination" id="destination"
+               placeholder="Destination">
+        <button id="submit" disabled="disabled">Find Route</button>
+      </form>
+    </div>
+    <div id="output">
+    </div>
+  </body>
+</html>
