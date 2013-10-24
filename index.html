@@ -113,10 +113,12 @@
 
         lastStart = null;
 
-        if (destination)
+        if (destination) {
           findRoute(destination);
-        else
-          setDest(0);
+        } else {
+          waypoints = [0];
+          setDest();
+        }
       }
 
       function findRoute(destination) {
@@ -149,28 +151,30 @@
           output.appendChild(node);
       }
 
-      function setDest(sysId) {
+      function setDest() {
         if (!window.CCPEVE)
           return;
 
-        setDestDest = sysId;
-        if (currentSetDestTimeout)
+        if (currentSetDestTimeout || waypoints.length == 0)
           return;
 
         var now = new Date();
-        if (!lastSetDest)
-          lastSetDest = 0;
         var since = now - lastSetDest;
         if (since > 1500) {
+          var sysId = waypoints.shift();
           CCPEVE.setDestination(sysId);
           lastSetDest = now;
-        } else {
+          since = 0;
+        }
+
+        if (waypoints.length > 0) {
           currentSetDestTimeout = window.setTimeout(function() {
               currentSetDestTimeout = null;
-              setDest(setDestDest);
+              setDest();
             }, 1500 - since);
         }
       }
+
       function displayRoute(routeText) {
         var lines = routeText.split("\n");
         if (lines.length > 0 && lines[lines.length-1] == "")
@@ -195,7 +199,8 @@
             document.createTextNode("Total jumps: " + (lines.length - 1)));
         resultTotal.setAttribute("id", "total");
         resultDiv.appendChild(resultTotal);
-        var dest = null;
+        waypoints = [0];
+        var destSet;
         var lastSysId;
         for (var i = 0; i < lines.length; ++i) {
           var r = /^(\d+):(.*?)(?: @ (\d+)-(\d+))?$/.exec(lines[i]);
@@ -232,23 +237,20 @@
           li.appendChild(spanSys);
 
           var sysId = parseInt(r[1]);
-          if (r[3] || i == lines.length - 1) {
-            if (!dest) {
-              li.setAttribute("class", "destination");
-              if (r[3]) {
-                if (lastSysId)
-                  dest = lastSysId;
-                else
-                  dest = 0;
-              } else {
-                dest = sysId;
-              }
+          if (!destSet && (r[3] || i == lines.length - 1)) {
+            destSet = true;
+            li.setAttribute("class", "destination");
+            if (r[3]) {
+              if (lastSysId)
+                waypoints.push(lastSysId);
+            } else {
+              waypoints.push(sysId);
             }
           }
           lastSysId = sysId;
           resultList.appendChild(li);
         }
-        setDest(dest);
+        setDest();
         resultDiv.appendChild(resultList);
         setOutput(resultDiv);
       }
@@ -256,9 +258,9 @@
       var currentRequest;
       var currentTimeout;
       var lastStart;
-      var lastSetDest;
+      var lastSetDest = 0;
       var currentSetDestTimeout;
-      var setDestDest;
+      var waypoints = [];
       //if (window.CCPEVE) {
       {
         document.addEventListener("DOMContentLoaded", function() {
