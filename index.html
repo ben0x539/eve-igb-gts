@@ -234,10 +234,12 @@
               li.setAttribute("class", "destination");
               destinationSet = true;
               if (window.CCPEVE) {
-                if (i == lines.length - 1)
+                if (r[3]) {
+                  if (lastSysId)
+                    waypoints.push(lastSysId);
+                } else {
                   waypoints.push(sysId);
-                else if (lastSysId)
-                  waypoints.push(lastSysId);
+                }
               }
             }
           }
