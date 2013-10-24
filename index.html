@@ -105,10 +105,6 @@
           window.clearTimeout(currentTimeout);
           currentTimeout = null;
         }
-        if (waypointTimeout) {
-          window.clearTimeout(waypointTimeout);
-          waypointTimeout = null;
-        }
 
         setOutput();
 
@@ -116,6 +112,8 @@
 
         if (destination)
           findRoute(destination);
+        else
+          setDest(0);
       }
 
       function findRoute(destination) {
@@ -148,19 +146,28 @@
           output.appendChild(node);
       }
 
-      function popWaypoint() {
-        if (waypoints.length == 0)
+      function setDest(sysId) {
+        if (!window.CCPEVE)
           return;
-        var sysId = waypoints.shift();
-        if (window.CCPEVE) {
-          if (sysId == 0)
-            CCPEVE.setDestination(0);
-          else
-            CCPEVE.addWaypoint(sysId);
-        }
-        waypointTimeout = window.setTimeout(popWaypoint, 1500);
-      }
 
+        setDestDest = sysId;
+        if (currentSetDestTimeout)
+          return;
+
+        var now = new Date();
+        if (!lastSetDest)
+          lastSetDest = 0;
+        var since = now - lastSetDest;
+        if (since > 1500) {
+          CCPEVE.setDestination(sysId);
+          lastSetDest = now;
+        } else {
+          currentSetDestTimeout = window.setTimeout(function() {
+              currentSetDestTimeout = null;
+              setDest(setDestDest);
+            }, 1500 - since);
+        }
+      }
       function displayRoute(routeText) {
         var lines = routeText.split("\n");
         if (lines.length > 0 && lines[lines.length-1] == "")
@@ -185,14 +192,7 @@
             document.createTextNode("Total jumps: " + (lines.length - 1)));
         resultTotal.setAttribute("id", "total");
         resultDiv.appendChild(resultTotal);
-        var destinationSet = false;
-        waypoints = [0];
-        if (waypointTimeout) {
-          window.clearTimeout(waypointTimeout);
-          waypointTimeout = null;
-        }
-        waypointTimeout = window.setTimeout(popWaypoint, 1500);
-        var sysId;
+        var dest = null;
         var lastSysId;
         for (var i = 0; i < lines.length; ++i) {
           var r = /^(\d+):(.*?)(?: @ (\d+)-(\d+))?$/.exec(lines[i]);
@@ -228,24 +228,24 @@
             spanSys.setAttribute("class", "system-name");
           li.appendChild(spanSys);
 
-          sysId = parseInt(r[1]);
+          var sysId = parseInt(r[1]);
           if (r[3] || i == lines.length - 1) {
-            if (!destinationSet) {
+            if (!dest) {
               li.setAttribute("class", "destination");
-              destinationSet = true;
-              if (window.CCPEVE) {
-                if (r[3]) {
-                  if (lastSysId)
-                    waypoints.push(lastSysId);
-                } else {
-                  waypoints.push(sysId);
-                }
+              if (r[3]) {
+                if (lastSysId)
+                  dest = lastSysId;
+                else
+                  dest = 0;
+              } else {
+                dest = sysId;
               }
             }
           }
           lastSysId = sysId;
           resultList.appendChild(li);
         }
+        setDest(dest);
         resultDiv.appendChild(resultList);
         setOutput(resultDiv);
       }
@@ -253,8 +253,9 @@
       var currentRequest;
       var currentTimeout;
       var lastStart;
-      var waypoints;
-      var waypointTimeout;
+      var lastSetDest;
+      var currentSetDestTimeout;
+      var setDestDest;
       //if (window.CCPEVE) {
       {
         document.addEventListener("DOMContentLoaded", function() {
